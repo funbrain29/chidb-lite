@@ -1,5 +1,16 @@
 #include "btree.h"
 
+
+struct btree_page *unpack_btree_page(uint8_t *raw, uint32_t size, uint32_t page_number) {
+    struct serializer ss = { .base = raw, .size = size, .cursor = 0 };
+    struct btree_page *bpage = must_malloc(size);
+    bpage->number = page_number;
+    bpage->type = unpack_uint8(&ss);
+    printf("page number         : %d\n", bpage->number);
+    printf("page type           : %d\n", bpage->type);
+    return bpage;
+}
+
 void unpack_file_header(uint8_t *raw, uint32_t size, struct file_header *head) {
     struct serializer ss = { .base = raw, .size = size, .cursor = 0 };
     unpack_raw_string(&ss, (uint8_t *) &head->header_string, 16);
