@@ -9,6 +9,8 @@
 void unpack_file_header(uint8_t *raw, uint32_t size, struct file_header *head);
 void print_file_header(struct file_header *head);
 struct btree_page *unpack_btree_page(uint8_t *raw, uint32_t size, uint32_t page_number);
+void print_btree_page(struct btree_page *bpage);
+void free_btree_page(struct btree_page *bpage);
 
 int main(int argc, char **argv) {
     int pagenumber = 0;
@@ -50,15 +52,20 @@ int main(int argc, char **argv) {
         lseek(fd,FILE_HEADER_SIZE ,SEEK_SET);
     } else {
         int page_offset = head.page_size*(pagenumber-1);
-        printf("page offset: %d\n", page_offset);
+        printf("page offset         : %d\n", page_offset);
         lseek(fd,page_offset,SEEK_SET);
     }
     uint8_t *raw2 = must_malloc(head.page_size);
     ssize_t bytes_read2 = read(fd,raw2,head.page_size);
     assert(bytes_read2 == head.page_size);
-    unpack_btree_page(raw2,head.page_size,pagenumber);
+    struct btree_page *bpage = unpack_btree_page(raw2,head.page_size,pagenumber);
+    printf("\n");
+    print_btree_page(bpage);
 
     int close_ret = close(fd);
     assert(close_ret >= 0);
+    free(raw2);
+    free_btree_page(bpage);
+
     return 0;
 }

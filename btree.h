@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "serializer.h"
 
 #define FILE_HEADER_SIZE 100
@@ -58,19 +59,18 @@ struct btree_page {
     struct btree_cell *cells;
 };
 
-struct btree_cell {
-    uint32_t left_child;
-    int64_t key;
-    uint16_t field_count;
-    struct btree_field *fields;
-};
-
 enum btree_field_type {
     btree_null,
     btree_integer,
     btree_float,
     btree_text,
     btree_blob
+};
+struct btree_cell {
+    uint32_t left_child;
+    int64_t key;
+    uint16_t field_count;
+    struct btree_field *fields;
 };
 
 struct btree_field {
@@ -94,3 +94,4 @@ void unpack_btree_cell(enum btree_page_type type, uint8_t *raw, uint32_t size, u
 struct btree_page *unpack_btree_page(uint8_t *raw, uint32_t size, uint32_t page_number);
 void free_btree_cell(struct btree_cell *cell);
 void free_btree_page(struct btree_page *page);
+uint16_t unpack_btree_cell_helper(uint8_t *raw, uint32_t size, uint32_t cursor, uint64_t header_length);
