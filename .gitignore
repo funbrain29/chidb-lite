@@ -1,4 +1,6 @@
 /.vscode
+/sqlite_iterator/.vscode
+/sqlite_iterator/valgrind.log
 /notes
-a.out
+*.out
 *.o
