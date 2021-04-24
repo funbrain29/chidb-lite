@@ -20,10 +20,10 @@ int main() {
     int returnValue = 0;
     int fd;
     struct file_header head;
-        uint32_t people_root;
-        uint32_t titles_root;
-        uint32_t crew_root;
-        uint32_t crew_titleid_index_root;
+    uint32_t people_root;
+    uint32_t titles_root;
+    uint32_t crew_root;
+    uint32_t crew_titleid_index_root;
 
     // if you are loading from a file other than test.db, change this
     if (pagesizenumber == 1) {
