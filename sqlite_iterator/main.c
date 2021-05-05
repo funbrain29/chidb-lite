@@ -14,7 +14,7 @@ int first_version(struct file_header head, int fd, uint32_t rooms_root);
 int second_version(struct file_header head, int fd, uint32_t rooms_root, uint32_t rooms_zones_index);
 
 int main() {
-    int querynumber = 1;
+    int querynumber = 2;
 
     int returnValue = 0;
     int fd;
@@ -126,7 +126,6 @@ int second_version(struct file_header head, int fd, uint32_t rooms_root, uint32_
             struct cell *index_cell = query_get(zones_iter);
             // break if the next cell is not from the current zone
             if (index_cell->fields[0].value.integer != zones[i]) {
-                printf("-------freeing zones\n");
                 free_query_iterator(zones_iter);
                 break;
             }
