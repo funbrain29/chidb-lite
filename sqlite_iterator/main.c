@@ -9,39 +9,22 @@
 #include <string.h>
 #include <unistd.h>
 
-int first_query(struct file_header head, int fd, uint32_t people_root, uint32_t titles_root, uint32_t crew_root);
-int second_query(struct file_header head, int fd, uint32_t people_root, uint32_t titles_root, uint32_t crew_root);
-int third_query(struct file_header head, int fd, uint32_t people_root, uint32_t titles_root, uint32_t crew_root, uint32_t crew_titleid_index_root);
+bool if_zone(int64_t zone);
+int first_version(struct file_header head, int fd, uint32_t rooms_root);
+int second_version(struct file_header head, int fd, uint32_t rooms_root, uint32_t rooms_zones_index);
 
 int main() {
     int querynumber = 1;
-    int pagesizenumber = 1;
 
     int returnValue = 0;
     int fd;
     struct file_header head;
-    uint32_t people_root;
-    uint32_t titles_root;
-    uint32_t crew_root;
-    uint32_t crew_titleid_index_root;
 
-    // if you are loading from a file other than test.db, change this
-    if (pagesizenumber == 1) {
-        fd = open("imdb-4096.db", O_RDONLY);
-        people_root = 2;
-        titles_root = 72;
-        crew_root = 118;
-        crew_titleid_index_root = 287;
-        assert(fd >= 0);
-    }
-    if (pagesizenumber == 2) {
-        fd = open("imdb-512.db", O_RDONLY);
-        people_root = 2;
-        titles_root = 579;
-        crew_root = 979;
-        crew_titleid_index_root = 2393;
-        assert(fd >= 0);
-    }
+    fd = open("mud.db", O_RDONLY);
+    int rooms_root = 3;
+    int rooms_zones_index = 212;
+    assert(fd >= 0);
+
     uint8_t *raw = must_malloc(FILE_HEADER_SIZE);
     ssize_t ret = read(fd, raw, FILE_HEADER_SIZE);
     assert(ret == FILE_HEADER_SIZE);
@@ -53,15 +36,13 @@ int main() {
     // Query functions go here:
     if (querynumber == 1) {
         printf("Performing first query:\n");
-        returnValue = first_query(head,fd,people_root,titles_root,crew_root);
+        returnValue = first_version(head,fd,rooms_root);
+        printf("\nFirst query finished, closing program...\n");
         assert(returnValue == 0);
     } else if (querynumber == 2) {
         printf("\nPerforming second query:\n");
-        returnValue = second_query(head,fd,people_root,titles_root,crew_root);
-        assert(returnValue == 0);
-    } else if (querynumber == 3) {
-        printf("\nPerforming third query:\n");
-        returnValue = third_query(head,fd,people_root,titles_root,crew_root,crew_titleid_index_root);
+        returnValue = second_version(head,fd,rooms_root,rooms_zones_index);
+        printf("\nSecond query finished, closing program...\n");
         assert(returnValue == 0);
     }
 
@@ -72,200 +53,106 @@ int main() {
     return returnValue;
 }
 
-// Scan the titles table to find the title_id of ‘Inception’, then scan the crew table and for each record with matching title_id lookup the record in people and print the result.
-int first_query(struct file_header head, int fd, uint32_t people_root, uint32_t titles_root, uint32_t crew_root) {
+bool if_zone(int64_t zone) {
+    switch (zone) {
+        case 11:
+        case 12:
+        case 47:
+        case 50:
+        case 51:
+        case 52:
+        case 62:
+        case 65:
+        case 30:
+        case 60:
+        case 70:
+        case 79:
+        return true;
+        default:
+        return false;
+    }
+}
+
+
+int first_version(struct file_header head, int fd, uint32_t rooms_root) {
     // set count to track seeks
     int count = 0;
+    int printed = 0;
+    const char *cave = "cave";
+    char *current;
 
-    struct query_iterator *title_iter = query_seek(&head, fd, titles_root, 1);
-    if (title_iter == NULL)  {
+    struct query_iterator *rooms_iter = query_seek(&head, fd, rooms_root, 1);
+    if (rooms_iter == NULL)  {
         // note: when query_seek returns NULL, it means the key was not found
         // and there is no memory allocation to worry about
         printf("not found\n");
         return 0;
     }
-    int64_t title_key = 0;
     do {
-        struct cell *cell = query_get(title_iter);
-        if (!strcmp((const char *) cell->fields[2].value.text.string, "Inception")) {
-            title_key = cell->key;
+        struct cell *cell = query_get(rooms_iter);
+        if (if_zone(cell->fields[1].value.integer)) {
+            current = strstr((const char *)cell->fields[3].value.text.string, cave);
+            if (current) {
+                printf("%s\n",cell->fields[3].value.text.string);
+                printed++;
+            }
         }
         count++;
-    } while (query_step(title_iter));
-
-
-    struct query_iterator *crew_iter = query_seek(&head, fd, crew_root, 1);
-    if (crew_iter == NULL)  {
-        printf("not found\n");
-        return 0;
-    }
-    struct cell* crew_cells[10];
-    int i = 0;
-    do {
-        struct cell *cell = query_get(crew_iter);
-        if (title_key == cell->fields[0].value.integer) {
-            crew_cells[i] = cell;
-            i++;
-        }
-        count++;
-    } while (query_step(crew_iter));
-
-
-for (int j = 0; j < i;j++) {
-    struct query_iterator *people_iter = query_seek(&head, fd, people_root, 1);
-    if (people_iter == NULL)  {
-        printf("not found\n");
-        return 0;
-    }
-
-    do {
-        struct cell *cell = query_get(people_iter);
-        if (crew_cells[j]->fields[1].value.integer == cell->key) { // match person id
-            print_cell(cell);
-        }
-        count++;
-    } while (query_step(people_iter));
-}
-
-    // note: when query_step returns false, it means there are no more records
-    // left and all memory from the iterator has been freed already.
-    // If you finish using an iterator before query_step returns false, you must
-    // call free_query_iterator on it to clean up.
+    } while (query_step(rooms_iter));
 
     printf("found %d entries\n", count);
-
-    // report on number of steps, page loads, etc.
+    printf("printed %d entries\n", printed);
     report();
 
     return 0;
 }
 
-// Scan the crew table, and for each record look up the corresponding title entry. If it’s a match, look up the corresponding person entry and print it.
+int second_version(struct file_header head, int fd, uint32_t rooms_root, uint32_t rooms_zones_index) {
 
-int second_query(struct file_header head, int fd, uint32_t people_root, uint32_t titles_root, uint32_t crew_root) {
     // set count to track seeks
+    int printed = 0;
     int count = 0;
+    const char *cave = "cave";
+    char *current;
+    int zones[12] = {11,12,47,50,51,52,62,65,30,60,70,79};
 
-    struct query_iterator *crew_iter = query_seek(&head, fd, crew_root, 1);
-    if (crew_iter == NULL)  {
-        printf("not found\n");
-        return 0;
-    }
-    do { // for every item in the crew table
-        struct cell *crewcell = query_get(crew_iter);
-
-        struct query_iterator *titles_iter = query_seek(&head, fd, titles_root, crewcell->fields[0].value.integer);
-        if (titles_iter == NULL)  {
+    for (int i = 0; i < 12; i++) {
+        struct query_iterator *zones_iter = query_seek(&head, fd, rooms_zones_index, zones[i]);
+        if (zones_iter == NULL)  {
             printf("not found\n");
             return 0;
         }
-
-        do { // for every item in the title table
-            struct cell *titlecell = query_get(titles_iter);
-            if (crewcell->fields[0].value.integer == titlecell->key) {
-                if (!strcmp((const char *) titlecell->fields[2].value.text.string, "Inception")) {
-
-                    struct query_iterator *people_iter = query_seek(&head, fd, people_root, 1);
-                    if (people_iter == NULL)  {
-                        printf("not found\n");
-                        return 0;
-                    }
-
-                    do { // for every item in the people table
-                        struct cell *peoplecell = query_get(people_iter);
-                        if (peoplecell->key == crewcell->fields[1].value.integer) {
-                            print_cell(peoplecell);
-                        }
-                    } while (query_step(people_iter));
-                } else {
-                    free_query_iterator(titles_iter);
-                    break;
-                }
+        do {
+            struct cell *index_cell = query_get(zones_iter);
+            // break if the next cell is not from the current zone
+            if (index_cell->fields[0].value.integer != zones[i]) {
+                printf("-------freeing zones\n");
+                free_query_iterator(zones_iter);
+                break;
             }
-            count++;
-        } while (query_step(titles_iter));
-        count++;
-    } while (query_step(crew_iter));
-
-    printf("found %d entries\n", count);
-
-    report();
-
-    return 0;
-}
-
-// Create an index:
-// CREATE INDEX crew_title_id ON crew (title_id);
-// Search the titles table to find the title_id, use the index to find matching crew entries, and for each one lookup the matching person record and print out info.
-int third_query(struct file_header head, int fd, uint32_t people_root, uint32_t titles_root, uint32_t crew_root, uint32_t crew_titleid_index_root) {
-    int count = 0;
-
-    struct query_iterator *title_iter = query_seek(&head, fd, titles_root, 1);
-    if (title_iter == NULL)  {
-        printf("not found\n");
-        return 0;
-    }
-    int64_t title_key = 0;
-    do {
-        struct cell *cell = query_get(title_iter);
-        if (!strcmp((const char *) cell->fields[2].value.text.string, "Inception")) {
-            title_key = cell->key;
-        }
-        count++;
-    } while (query_step(title_iter));
-
-
-    struct query_iterator *index_iter = query_seek(&head, fd, crew_titleid_index_root, title_key);
-    if (index_iter == NULL)  {
-        printf("not found\n");
-        return 0;
-    }
-    do {
-        struct cell *indexcell = query_get(index_iter);
-        if (indexcell->fields[0].value.integer == title_key) {
-            int crew_key = indexcell->fields[1].value.integer;
-
-            struct query_iterator *crew_iter = query_seek(&head, fd, crew_root, crew_key);
-            if (index_iter == NULL)  {
+            // start new iter at the room id found by the index
+            struct query_iterator *rooms_iter = query_seek(&head, fd, rooms_root, index_cell->fields[1].value.integer);
+            if (rooms_iter == NULL)  {
                 printf("not found\n");
                 return 0;
             }
-
             do {
-                struct cell *crewcell = query_get(crew_iter);
-                if (crewcell->key == crew_key) {
-                    int people_key = crewcell->fields[1].value.integer;
-
-                    struct query_iterator *people_iter = query_seek(&head, fd, people_root, people_key);
-                    if (index_iter == NULL)  {
-                        printf("not found\n");
-                        return 0;
-                    }
-                    do {
-                        struct cell *peoplecell = query_get(people_iter);
-                        if (peoplecell->key == people_key) {
-                            print_cell(peoplecell);
-                        }
-                        count++;
-                    } while (query_step(people_iter));
-
-                } else {
-                    free_query_iterator(crew_iter);
-                    break;
+                struct cell *rooms_cell = query_get(rooms_iter);
+                current = strstr((const char *)rooms_cell->fields[3].value.text.string, cave);
+                if (current) {
+                    printf("%s\n",rooms_cell->fields[3].value.text.string);
+                    printed++;
                 }
-
+                free_query_iterator(rooms_iter);
                 count++;
-            } while (query_step(crew_iter));
-
-        } else {
-            free_query_iterator(index_iter);
-            break;
-        }
-        count++;
-    } while (query_step(index_iter));
+                break;
+            } while (query_step(rooms_iter));
+            count++;
+        } while (query_step(zones_iter));
+    }
 
     printf("found %d entries\n", count);
-
+    printf("printed %d entries\n", printed);
     report();
 
     return 0;
